@@ -11,14 +11,7 @@
 
 typedef void* JobHandle;
 
-//enum stage_t {UNDEFINED_STAGE=0, MAP_STAGE=1, SHUFFLE_STAGE=2, REDUCE_STAGE=3};
-/*
-typedef struct {
-        stage_t stage;
-        float percentage;
-} JobState;
-*/
-//
+
 struct ThreadContext
 {
     int id;
@@ -86,9 +79,25 @@ void *startRoutine(void* arg)
     job->_jobState->percentage = 0.0;
     for (auto item: *(job->tc)[job->runningThreadId]->interVec)
     {
-        something please
-
+        // maybe it would be better in some other function? so this one will be smaller.
+        // todo add something about percentage and maybe atomic variable
+        K2 *key =item.first;
+        auto it = (job ->interMap)->find(key);
+        if (it == job->interMap->end())
+        {
+            std::vector <V2 *> vector;
+            vector.push_back(item.second);
+            std::pair <K2*, std::vector<V2 *>> pair(item.first, vector);
+            job->interMap->insert(pair);
+        }
+        else
+        {
+            it->second.push_back(item.second);
+        }
     }
+    // Sort??
+
+    // Reduce
 
     return 0;
 }
@@ -100,8 +109,8 @@ JobHandle startMapReduceJob(const MapReduceClient& client, const InputVec& input
     ThreadContext tcs[multiThreadLevel];
 
     auto *jobContext = new JobContext(client, inputVec, outputVec, new IntermediateMap(),
-            new JobState({UNDEFINED_STAGE, 0}),
-            new Barrier(multiThreadLevel), multiThreadLevel);
+                                      new JobState({UNDEFINED_STAGE, 0}),
+                                      new Barrier(multiThreadLevel), multiThreadLevel);
 
 
     for (int i = 0; i < multiThreadLevel - 1; ++i)

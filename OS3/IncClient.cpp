@@ -10,7 +10,7 @@
 
 #include "MapReduceFramework.h"
 
-pthread_mutex_t k2ResourcesMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t k2INCResourcesMutex = PTHREAD_MUTEX_INITIALIZER;
 
 class Intgrv: public V1, public V2, public V3
 {
@@ -46,8 +46,12 @@ public:
     {
         return _val < static_cast<const Intgrk&>(other)._val;
     }
-
+    void printk()
+    {
+        printf("K = %d\n", _val);
+    }
     int _val;
+
 };
 
 class IncClient : public MapReduceClient
@@ -81,18 +85,21 @@ public:
 
     void map(const K1* key, const V1* value, void* context) const
     {
-        int i, newK;
-        newK = static_cast<const Intgrv*>(value)->_val;
-        i = newK + 1;
+        int newK, newv;
+        auto* newIntgrk = (Intgrk*)(key);
+        auto* newIntgrv = (Intgrv*)(value);
+        newK = newIntgrk->_val;
+        newv = newIntgrv->_val;
+        newv = newv + 1;
         Intgrk* k2 = new Intgrk(newK);
-        Intgrv* v2 = new Intgrv(i);
+        Intgrv* v2 = new Intgrv(newv);
 
-        pthread_mutex_lock(&k2ResourcesMutex);
+        pthread_mutex_lock(&k2INCResourcesMutex);
         resourcesK2->push_back(k2);
         resourcesV2->push_back(v2);
-        pthread_mutex_unlock(&k2ResourcesMutex);
+        pthread_mutex_unlock(&k2INCResourcesMutex);
 
-        v2->printv();
+//        v2->printv();
         emit2(k2, v2, context);
     }
 
@@ -107,7 +114,7 @@ public:
         Intgrk* k3 = new Intgrk(newK);
         Intgrv* v3 = new Intgrv(res);
 
-        v3->printv();
+//        v3->printv();
         emit3(k3, v3, context);
     }
 };

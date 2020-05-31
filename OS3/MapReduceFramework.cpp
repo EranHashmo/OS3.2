@@ -35,27 +35,31 @@ struct JobContext
     const MapReduceClient &_client;
     const InputVec &inVec;
     IntermediateMap *interMap;
-    const OutputVec &outVec;
+    std::vector<K2*> K2Vec;
+    OutputVec &outVec;
     JobState *_jobState;
     Barrier *_barrier;
     int _multiThreadLvl;
 //    std::map<pthread_t*, ThreadContext*> tc;
-    pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t  cond = PTHREAD_COND_INITIALIZER;
+    pthread_mutex_t reduceMutex = PTHREAD_MUTEX_INITIALIZER;
+//    pthread_cond_t  cond = PTHREAD_COND_INITIALIZER;
 //    int count;
     std::vector<ThreadContext*> tcs;
     std::queue<int> finishedThreadsQ;
-    std::atomic<int> jobAtomic;
+    std::atomic<int> mapAtomic;
+    std::atomic<int> reduceAtomic;
     std::atomic<int> finishedThreadsNum;
     std::atomic<int> runningThreadId;
 
     JobContext(const MapReduceClient &client, const InputVec &inputVec, OutputVec &outputVec,
             IntermediateMap *intermediateMap, JobState *jobState,
                Barrier *barrier, int multiThreadLevel)
-            : _client(client), inVec(inputVec), outVec(outputVec), interMap(intermediateMap), _jobState(jobState),
-              _barrier(barrier), _multiThreadLvl(multiThreadLevel), jobAtomic(0),
-              runningThreadId(0), finishedThreadsQ(), finishedThreadsNum(0),  tcs(multiThreadLevel)
+            : _client(client), inVec(inputVec), outVec(outputVec), interMap(intermediateMap), K2Vec(),
+              _jobState(jobState),
+              _barrier(barrier), _multiThreadLvl(multiThreadLevel), mapAtomic(0), reduceAtomic(0),
+              runningThreadId(0), finishedThreadsQ(), finishedThreadsNum(0), tcs(multiThreadLevel)
     {
+        pthread_mutex_init(&reduceMutex, NULL);
     }
 };
 
@@ -92,7 +96,12 @@ void emit2 (K2* key, V2* value, void* context)
 
 void emit3 (K3* key, V3* value, void* context)
 {
-//    outV->emplace_back(OutputPair(key, value));
+    auto job = (JobContext*) context;
+    OutputPair pair(key, value);
+
+    safeLock(&job->reduceMutex);
+    job->outVec.push_back(pair);
+    safeUnlock(&job->reduceMutex);
 }
 
 void *startRoutine(void* arg)
@@ -101,6 +110,7 @@ void *startRoutine(void* arg)
     job->_jobState->stage = MAP_STAGE;
 
      std::vector<IntermediatePair> interVec;
+     std::vector<K2*> K2Vec;
 //    auto *threadVector = new std::vector<IntermediatePair>;
     auto *tc = new ThreadContext({job->runningThreadId++, interVec, pthread_mutex_t()});
     pthread_mutex_init(&tc->tMutex, NULL);
@@ -138,10 +148,13 @@ void *startRoutine(void* arg)
             safeLock(&tc->tMutex);
             for (auto pair : (job->tcs[id])->interVec)
             {
+                K2* k = pair.first;
                 if (job->interMap->find(pair.first) == job->interMap->end())
                 {
                     std::vector <V2 *> vector;
                     (*job->interMap)[pair.first] = vector;
+
+                    (job->K2Vec).push_back(k);
                 }
                 (*job->interMap)[pair.first].push_back(pair.second);
             }
@@ -171,7 +184,7 @@ void *startRoutine(void* arg)
         {
         while (true)
         {
-            oldVal = (job->jobAtomic)++;
+            oldVal = (job->mapAtomic)++;
             if (oldVal >= (job->inVec).size())
             {
 //                job->_jobState->percentage = 100;
@@ -190,8 +203,8 @@ void *startRoutine(void* arg)
                 (tc->interVec).end(), key2Comp);      //sort
     }
 
-    safeLock(&tc->tMutex);
     job->finishedThreadsNum++;
+    safeLock(&tc->tMutex);
     job->finishedThreadsQ.push(tc->id);
     safeUnlock(&tc->tMutex);
 
@@ -202,10 +215,29 @@ void *startRoutine(void* arg)
 
 
     // Reduce
-    job->_jobState->stage = SHUFFLE_STAGE;
-    job->_jobState->percentage = 0.0;
+
+    if (job->interMap->empty())
+    {
+        printf("EMPTY\n");
+    }
+    while (true)
+    {
+        oldVal = (job->reduceAtomic)++;
+        if (oldVal >= job->K2Vec.size())
+        {
+            break;
+        }
+        K2* key2 = (job->K2Vec)[oldVal];
+        std::vector<V2*> v = (*job->interMap)[key2];
+        job->_client.reduce(key2, v, job);
+        safeLock(&tc->tMutex);
+        job->_jobState->percentage = (float)(oldVal / job->inVec.size()) * 100;
+        safeUnlock(&tc->tMutex);
+    }
 
     delete tc;
+
+    job->_barrier->barrier();
 
     return 0;
 }
@@ -227,7 +259,6 @@ JobHandle startMapReduceJob(const MapReduceClient& client, const InputVec& input
         pthread_create(threads +i, NULL, startRoutine, jobContext);
     }
 
-
     for (int i = 0; i < multiThreadLevel; ++i)
     {
         pthread_join(*(threads + i), NULL);
@@ -235,19 +266,25 @@ JobHandle startMapReduceJob(const MapReduceClient& client, const InputVec& input
 
     printf("after join\n");
 
-    if (jobContext->interMap->empty())
+    if (outputVec.empty())
     {
         printf("EMPTY\n");
     }
-    for (auto pair : *jobContext->interMap)
+    for (auto pair : outputVec)
     {
         ((Intgrk*)pair.first)->printk();
-        std::vector< V2*> v = pair.second;
-        for (auto item : v)
-        {
-            ((Intgrv*)item)->printv();
-        }
+        ((Intgrv*)pair.second)->printv();
     }
+
+//    for (auto pair : *jobContext->interMap)
+//    {
+//        ((Intgrk*)pair.first)->printk();
+//        std::vector< V2*> v = pair.second;
+//        for (auto item : v)
+//        {
+//            ((Intgrv*)item)->printv();
+//        }
+//    }
 
     delete jobContext->interMap;
     delete jobContext->_jobState;

@@ -106,7 +106,7 @@ public:
     void reduce(const K2* key, const std::vector<V2 *> &values, void* context) const
     {
         int res = 0;
-        int newK = -1;
+        int newK = -1 * ((Intgrk*)key)->_val;
         for (V2* val : values)
         {
             res += static_cast<const Intgrv*>(val)->_val;

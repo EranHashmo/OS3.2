@@ -50,11 +50,17 @@ int main(int argc, char *argv[])
 
     startMapReduceJob(client, *inVec ,*outVec, multiThreadLevel);
 
-//    for (std::pair<K3 *, V3 *> oPair: *(std::vector<OutputPair>*)outVec)
-//    {
-//        printf("%d: %d\n", *(int*)oPair.first, *(int*)oPair.second);
-//    }
+    for (std::pair<K3 *, V3 *> oPair: *(std::vector<OutputPair>*)outVec)
+    {
+        printf("%d: %d\n", *(int*)oPair.first, *(int*)oPair.second);
+    }
 
+//    std::map<int, int> m;
+//    for (int i = 0; i < 10; i++)
+//    {
+//        m[i] = i+ 100;
+//    }
+//
 
     printf("END!\n");
 

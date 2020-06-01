@@ -1,0 +1,1 @@
+/usr/bin/c++.exe -pthread -g  -Wl,--enable-auto-import CMakeFiles/OS3.dir/SampleClient.cpp.o CMakeFiles/OS3.dir/MapReduceFramework.cpp.o CMakeFiles/OS3.dir/Barrier.cpp.o  -o OS3.exe -Wl,--out-implib,libOS3.dll.a -Wl,--major-image-version,0,--minor-image-version,0 

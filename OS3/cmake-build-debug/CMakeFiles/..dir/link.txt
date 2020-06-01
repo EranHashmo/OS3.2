@@ -1,0 +1,1 @@
+/usr/bin/c++.exe -pthread -g  -Wl,--enable-auto-import CMakeFiles/..dir/SampleClient.cpp.o CMakeFiles/..dir/MapReduceFramework.cpp.o CMakeFiles/..dir/Barrier.cpp.o  -o ..exe -Wl,--out-implib,lib..dll.a -Wl,--major-image-version,0,--minor-image-version,0 

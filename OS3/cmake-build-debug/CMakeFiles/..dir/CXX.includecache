@@ -1,0 +1,46 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/cygdrive/c/Users/owner/CLionProjects/OS3.2/OS3/Barrier.h
+pthread.h
+-
+
+/cygdrive/c/Users/owner/CLionProjects/OS3.2/OS3/MapReduceClient.h
+vector
+-
+map
+-
+utility
+-
+
+/cygdrive/c/Users/owner/CLionProjects/OS3.2/OS3/MapReduceFramework.cpp
+MapReduceFramework.h
+/cygdrive/c/Users/owner/CLionProjects/OS3.2/OS3/MapReduceFramework.h
+MapReduceClient.h
+/cygdrive/c/Users/owner/CLionProjects/OS3.2/OS3/MapReduceClient.h
+Barrier.h
+/cygdrive/c/Users/owner/CLionProjects/OS3.2/OS3/Barrier.h
+map
+-
+iostream
+-
+atomic
+-
+pthread.h
+-
+algorithm
+-
+queue
+-
+unistd.h
+-
+
+/cygdrive/c/Users/owner/CLionProjects/OS3.2/OS3/MapReduceFramework.h
+MapReduceClient.h
+/cygdrive/c/Users/owner/CLionProjects/OS3.2/OS3/MapReduceClient.h
+

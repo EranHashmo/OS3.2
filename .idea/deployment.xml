@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData">
+    <serverData>
+      <paths name="Remote Host (55b79f4e-305c-4714-ae93-aa9c3a7ce312)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/OS3" local="$PROJECT_DIR$/OS3" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+  </component>
+</project>

@@ -42,7 +42,8 @@ struct JobContext
     Barrier *_barrier;
     int _multiThreadLvl;
 //    std::map<pthread_t*, ThreadContext*> tc;
-    pthread_mutex_t *generalMutex;
+    pthread_mutex_t *emit3Mutex;
+    pthread_mutex_t *stateMutex;
 //    pthread_cond_t  cond = PTHREAD_COND_INITIALIZER;
 //    int count;
     std::vector<ThreadContext*> tcs;
@@ -60,8 +61,10 @@ struct JobContext
               _barrier(barrier), _multiThreadLvl(multiThreadLevel), mapAtomic(0), reduceAtomic(0),
               runningThreadId(0), finishedThreadsQ(), finishedThreadsNum(0), tcs(multiThreadLevel)
     {
-        generalMutex = new pthread_mutex_t();       //TODO make deletable
-        pthread_mutex_init(generalMutex, NULL);
+        emit3Mutex = new pthread_mutex_t();       //TODO make deletable
+        pthread_mutex_init(emit3Mutex, NULL);
+        stateMutex = new pthread_mutex_t();       //TODO make deletable
+        pthread_mutex_init(stateMutex, NULL);
     }
 };
 
@@ -99,9 +102,9 @@ void emit2 (K2* key, V2* value, void* context)
 void emit3 (K3* key, V3* value, void* context)
 {
     auto job = (JobContext*) context;
-    safeLock(job->generalMutex);
+    safeLock(job->emit3Mutex);
     job->outVec.emplace_back(key, value);
-    safeUnlock(job->generalMutex);
+    safeUnlock(job->emit3Mutex);
 }
 
 void *startRoutine(void* arg)
@@ -110,7 +113,7 @@ void *startRoutine(void* arg)
     job->_jobState->stage = MAP_STAGE;
 
      auto *interVec = new std::vector<IntermediatePair>();
-     std::vector<K2*> K2Vec;
+//     std::vector<K2*> K2Vec;
 //    auto *threadVector = new std::vector<IntermediatePair>;
     int newID = job->runningThreadId++;
 //    auto *tc = new ThreadContext({newID, interVec, new pthread_mutex_t()});
@@ -125,15 +128,41 @@ void *startRoutine(void* arg)
 
     int oldVal = 0;
     int shuffleT = 0;
+
+    while (true)
+    {
+        oldVal = job->mapAtomic++;
+        if (oldVal >= (job->inVec).size())
+        {
+//                job->_jobState->percentage = 100;
+            break;
+        }
+        job->_client.map(job->inVec[oldVal].first, job->inVec[oldVal].second, tc);
+
+            safeLock(job->stateMutex);
+            job->_jobState->percentage = (float)(oldVal / job->inVec.size()) * 100;
+            safeUnlock(job->stateMutex);
+
+    }
+    if (!tc->interVec->empty())
+    {
+        std::sort((tc->interVec)->begin(),
+                  (tc->interVec)->end(), key2Comp);   //sort
+    }
+
+    job->finishedThreadsNum++;
+    job->finishedThreadsQ.push(tc->id);
+
+
     if (tc->id == shuffleT)
     {
         int id;
         while(true)  //  Shuffle
-                //and job->_jobState->percentage != 100)
+            //and job->_jobState->percentage != 100)
         {
             if (job->finishedThreadsQ.empty()  )
             {
-                if (job->finishedThreadsNum >= job->_multiThreadLvl-1)
+                if (job->finishedThreadsNum >= job->_multiThreadLvl)
                 {
                     break; //  shuffle finished
                 }
@@ -162,33 +191,6 @@ void *startRoutine(void* arg)
 
         }
     }
-    else
-    {
-        while (true)
-        {
-            oldVal = job->mapAtomic++;
-            if (oldVal >= (job->inVec).size())
-            {
-//                job->_jobState->percentage = 100;
-                break;
-            }
-            job->_client.map(job->inVec[oldVal].first, job->inVec[oldVal].second, tc);
-
-            safeLock(job->generalMutex);
-            job->_jobState->percentage = (float)(oldVal / job->inVec.size()) * 100;
-            safeUnlock(job->generalMutex);
-
-        }
-        for (int i =0; i < 1000000; i++){}
-        if (!tc->interVec->empty())
-        {
-            std::sort((tc->interVec)->begin(),
-                      (tc->interVec)->end(), key2Comp);   //sort
-        }
-    }
-
-    job->finishedThreadsNum++;
-    job->finishedThreadsQ.push(tc->id);
 
     if (tc->id == shuffleT)
     {
@@ -196,8 +198,8 @@ void *startRoutine(void* arg)
         job->_jobState->percentage = 0.0;
     }
     job->_barrier->barrier();
-    int x = 9;
-    job->_barrier->barrier();
+//    int x = 9;
+//    job->_barrier->barrier();
     // Reduce
 
     if (job->interMap->empty())
@@ -211,19 +213,18 @@ void *startRoutine(void* arg)
         {
             break;
         }
-        K2* key2 = (job->K2Vec)[oldVal];
-//        std::vector<V2*> v = ;
-        job->_client.reduce(key2, (*job->interMap)[key2], job);
-//        safeLock(&job->generalMutex);
-//        job->_jobState->percentage = (float)(oldVal / job->inVec.size()) * 100;
-//        safeUnlock(&job->generalMutex);
+        job->_client.reduce(job->K2Vec[oldVal], (*job->interMap)[job->K2Vec[oldVal]], job);
+        safeLock(job->stateMutex);
+        job->_jobState->percentage = ((float)oldVal / job->K2Vec.size()) * 100;
+        safeUnlock(job->stateMutex);
     }
+
+    job->_barrier->barrier();
     if (tc->id == shuffleT)
     {
         job->_jobState->stage = REDUCE_STAGE;
         job->_jobState->percentage = 100.0;
     }
-    job->_barrier->barrier();
     delete tc->interVec;
     pthread_mutex_destroy(tc->tMutex);
     delete tc->tMutex;

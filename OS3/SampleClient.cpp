@@ -8,6 +8,11 @@
 #include <array>
 #include <unistd.h>
 
+// my stuff
+//#include "MapReduceFramework.cpp"
+//------------------------
+
+
 pthread_mutex_t k2ResourcesMutex = PTHREAD_MUTEX_INITIALIZER;
 
 class VString : public V1 {

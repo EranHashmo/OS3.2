@@ -293,6 +293,34 @@ JobHandle startMapReduceJob(const MapReduceClient& client, const InputVec& input
     return jobContext;
 }
 
-void waitForJob(JobHandle job);
-void getJobState(JobHandle job, JobState* state);
-void closeJobHandle(JobHandle job);
+void waitForJob(JobHandle job)
+{
+    auto* state = ((JobContext*)job)->_jobState;
+    while(state->stage != REDUCE_STAGE || state->percentage != 100.0)
+    {
+        usleep(1000);
+        // todo check if after waiting state can change!!!
+    }
+}
+
+
+void getJobState(JobHandle job, JobState* state)
+{
+    state->stage = ((JobContext*)job)->_jobState->stage;
+    state->percentage = ((JobContext*)job)->_jobState->percentage;
+}
+
+
+void closeJobHandle(JobHandle job)
+{
+    auto* state = ((JobContext*)job)->_jobState;
+    if(state->stage != REDUCE_STAGE && state->percentage != 100.0)
+    {
+        //todo not sure what exactly we should free here
+    }
+    else
+    {
+        waitForJob(job);
+    }
+
+}
